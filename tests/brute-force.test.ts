@@ -51,6 +51,24 @@ describe("Brute Force Detection", () => {
     store.destroy();
   });
 
+  it("resets counter on successful login", () => {
+    const store = new MemoryStore();
+    const detect = createBruteForceDetector(store, { maxAttempts: 3, windowMs: 60000, blockDurationMs: 300000 });
+
+    // 2 failed attempts (just under threshold)
+    detect("10.0.0.7", "/login", 401);
+    detect("10.0.0.7", "/login", 401);
+
+    // Successful login → should clear the counter
+    detect("10.0.0.7", "/login", 200);
+
+    // Next failed attempt should restart from 1, not 3
+    const result = detect("10.0.0.7", "/login", 401);
+    expect(result.triggered).toBe(false);
+    expect(result.score).toBe(0);
+    store.destroy();
+  });
+
   it("blocks IP after many failed attempts", () => {
     const store = new MemoryStore();
     const detect = createBruteForceDetector(store, { maxAttempts: 3, windowMs: 60000, blockDurationMs: 300000 });

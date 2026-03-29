@@ -1,7 +1,7 @@
 {
   "name": "securitywatch",
   "version": "1.0.0",
-  "description": "Runtime security engine for Node.js apps — SQL injection, XSS, brute force, rate limiting, and IP reputation scoring in one middleware.",
+  "description": "Score-based runtime security middleware for Express. SQL injection, XSS, brute force, rate limiting, IP reputation.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -10,6 +10,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "demo": "npx tsx examples/demo-server.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "prepublishOnly": "npm run build"
@@ -23,18 +25,28 @@
     "rate-limit",
     "brute-force",
     "waf",
-    "runtime-security",
     "ip-reputation"
   ],
-  "author": "",
+  "author": "Sandeep Sharma",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sandeepsharmacode/securitywatch"
+  },
+  "homepage": "https://github.com/sandeepsharmacode/securitywatch#readme",
+  "bugs": {
+    "url": "https://github.com/sandeepsharmacode/securitywatch/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "peerDependencies": {
     "express": "^5.2.1"
   },
   "devDependencies": {
-    "@types/express": "^4.17.21",
-    "@types/node": "^20.11.0",
-    "typescript": "^5.3.3",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.5.0",
+    "typescript": "^6.0.2",
     "vitest": "^4.1.2"
   }
 }

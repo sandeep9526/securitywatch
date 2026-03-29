@@ -1,31 +1,38 @@
-import type { DetectionResult, RateLimitConfig, Store } from "../../types";
+import type { DetectionResult, RateLimitConfig, Store } from "../../types.js";
 
 const DEFAULTS: RateLimitConfig = {
-  windowMs: 60 * 1000, // 1 minute
+  windowMs: 60 * 1000,
   maxRequests: 100,
   routes: {},
 };
+
+function normalizePath(path: string): string {
+  return path
+    .split("?")[0]
+    .replace(/\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "/:id")
+    .replace(/\/\d+/g, "/:n");
+}
 
 export function createRateLimiter(store: Store, config?: Partial<RateLimitConfig>) {
   const opts = { ...DEFAULTS, ...config };
 
   return function detectRateLimit(ip: string, path: string): DetectionResult {
-    // Find route-specific limit
+    const normalized = normalizePath(path);
+
     let maxRequests = opts.maxRequests;
     for (const [route, limit] of Object.entries(opts.routes ?? {})) {
-      if (path.startsWith(route)) {
+      if (normalized.startsWith(route)) {
         maxRequests = limit;
         break;
       }
     }
 
-    const key = `rl:${ip}:${path}`;
+    const key = `rl:${ip}:${normalized}`;
     const globalKey = `rl:global:${ip}`;
 
     const routeCount = store.increment(key, opts.windowMs);
     const globalCount = store.increment(globalKey, opts.windowMs);
 
-    // Spike detection: more than 3x normal rate
     if (globalCount > opts.maxRequests * 3) {
       return {
         triggered: true,
@@ -40,7 +47,7 @@ export function createRateLimiter(store: Store, config?: Partial<RateLimitConfig
         triggered: true,
         score: 4,
         rule: "rate-limit",
-        reason: `Rate limit exceeded: ${routeCount}/${maxRequests} on ${path}`,
+        reason: `Rate limit exceeded: ${routeCount}/${maxRequests} on ${normalized}`,
       };
     }
 

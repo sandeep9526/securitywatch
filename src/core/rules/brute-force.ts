@@ -1,9 +1,9 @@
-import type { DetectionResult, BruteForceConfig, Store } from "../../types";
+import type { DetectionResult, BruteForceConfig, Store } from "../../types.js";
 
 const DEFAULTS: BruteForceConfig = {
   maxAttempts: 5,
-  windowMs: 5 * 60 * 1000, // 5 minutes
-  blockDurationMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 5 * 60 * 1000,
+  blockDurationMs: 15 * 60 * 1000,
   authRoutes: ["/login", "/signin", "/auth", "/api/auth", "/api/login"],
 };
 
@@ -26,7 +26,6 @@ export function createBruteForceDetector(store: Store, config?: Partial<BruteFor
     const blockKey = `bf:block:${ip}`;
     const attemptKey = `bf:attempts:${ip}`;
 
-    // Check if IP is currently blocked
     if (store.get(blockKey)) {
       return {
         triggered: true,
@@ -36,12 +35,16 @@ export function createBruteForceDetector(store: Store, config?: Partial<BruteFor
       };
     }
 
-    // Track failed attempts (4xx status = failed auth)
-    if (statusCode && statusCode >= 400 && statusCode < 500) {
+    // Clear counter on successful auth
+    if (statusCode !== undefined && statusCode >= 200 && statusCode < 300) {
+      store.delete(attemptKey);
+      return { triggered: false, score: 0, rule: "brute-force", reason: "" };
+    }
+
+    if (statusCode !== undefined && statusCode >= 400 && statusCode < 500) {
       const attempts = store.increment(attemptKey, opts.windowMs);
 
       if (attempts >= opts.maxAttempts * 4) {
-        // 20+ attempts → block 24 hours
         store.set(blockKey, true, 24 * 60 * 60 * 1000);
         return {
           triggered: true,
@@ -52,7 +55,6 @@ export function createBruteForceDetector(store: Store, config?: Partial<BruteFor
       }
 
       if (attempts >= opts.maxAttempts * 2) {
-        // 10+ attempts → block configured duration
         store.set(blockKey, true, opts.blockDurationMs);
         return {
           triggered: true,
@@ -68,6 +70,19 @@ export function createBruteForceDetector(store: Store, config?: Partial<BruteFor
           score: 7,
           rule: "brute-force",
           reason: `${attempts} failed login attempts in ${opts.windowMs / 60000} minutes`,
+        };
+      }
+    }
+
+    // Pre-request: check existing attempt count
+    if (statusCode === undefined) {
+      const currentAttempts = store.get<number>(attemptKey) ?? 0;
+      if (currentAttempts >= opts.maxAttempts) {
+        return {
+          triggered: true,
+          score: 5,
+          rule: "brute-force",
+          reason: `${currentAttempts} prior failed login attempts from this IP`,
         };
       }
     }
