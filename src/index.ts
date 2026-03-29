@@ -1,4 +1,4 @@
-export { securityWatch } from "./middleware/express";
+export { securityWatch } from "./middleware/express.js";
 
 // Types
 export type {
@@ -12,17 +12,18 @@ export type {
   BruteForceConfig,
   AlertConfig,
   Store,
-} from "./types";
+  SecurityWatchMiddleware,
+} from "./types.js";
 
 // Core (for advanced usage)
-export { DetectionEngine } from "./core/engine";
-export { IPScorer } from "./core/scorer";
-export { MemoryStore } from "./store/memory";
+export { DetectionEngine } from "./core/engine.js";
+export { IPScorer } from "./core/scorer.js";
+export { MemoryStore } from "./store/memory.js";
 
 // Individual rules (for custom pipelines)
-export { detectSQLInjection } from "./core/rules/sql-injection";
-export { detectXSS } from "./core/rules/xss";
-export { detectPayloadAnomaly } from "./core/rules/payload-anomaly";
-export { createBruteForceDetector } from "./core/rules/brute-force";
-export { createRateLimiter } from "./core/rules/rate-limit";
-export { createSuspiciousBehaviorDetector } from "./core/rules/suspicious-behavior";
+export { detectSQLInjection } from "./core/rules/sql-injection.js";
+export { detectXSS } from "./core/rules/xss.js";
+export { detectPayloadAnomaly } from "./core/rules/payload-anomaly.js";
+export { createBruteForceDetector } from "./core/rules/brute-force.js";
+export { createRateLimiter } from "./core/rules/rate-limit.js";
+export { createSuspiciousBehaviorDetector } from "./core/rules/suspicious-behavior.js";

@@ -1,4 +1,4 @@
-import type { Store, StoreEntry } from "../types";
+import type { Store, StoreEntry } from "../types.js";
 
 export class MemoryStore implements Store {
   private data = new Map<string, StoreEntry>();
@@ -6,7 +6,6 @@ export class MemoryStore implements Store {
 
   constructor(cleanupIntervalMs = 60_000) {
     this.cleanupInterval = setInterval(() => this.cleanup(), cleanupIntervalMs);
-    // Allow Node to exit even if interval is running
     if (this.cleanupInterval.unref) {
       this.cleanupInterval.unref();
     }

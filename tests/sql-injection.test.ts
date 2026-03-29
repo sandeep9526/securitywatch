@@ -50,4 +50,42 @@ describe("SQL Injection Detection", () => {
     const result = detectSQLInjection("user@example.com");
     expect(result.triggered).toBe(false);
   });
+
+  it("detects xp_cmdshell command execution", () => {
+    const result = detectSQLInjection("EXEC xp_cmdshell 'dir'");
+    expect(result.triggered).toBe(true);
+    expect(result.reason).toContain("command execution");
+  });
+
+  it("detects cmd.exe execution", () => {
+    const result = detectSQLInjection("cmd.exe /c whoami");
+    expect(result.triggered).toBe(true);
+  });
+
+  it("detects standalone DROP TABLE", () => {
+    const result = detectSQLInjection("DROP TABLE users");
+    expect(result.triggered).toBe(true);
+    expect(result.reason).toContain("schema manipulation");
+  });
+
+  it("detects ALTER TABLE", () => {
+    const result = detectSQLInjection("ALTER TABLE users ADD admin BOOLEAN");
+    expect(result.triggered).toBe(true);
+  });
+
+  it("detects GRANT ALL PRIVILEGES", () => {
+    const result = detectSQLInjection("GRANT ALL PRIVILEGES ON *.* TO 'root'");
+    expect(result.triggered).toBe(true);
+  });
+
+  it("detects INTO OUTFILE export", () => {
+    const result = detectSQLInjection("SELECT * INTO OUTFILE '/tmp/data.csv'");
+    expect(result.triggered).toBe(true);
+    expect(result.reason).toContain("mass data export");
+  });
+
+  it("detects mysqldump", () => {
+    const result = detectSQLInjection("mysqldump -u root database");
+    expect(result.triggered).toBe(true);
+  });
 });

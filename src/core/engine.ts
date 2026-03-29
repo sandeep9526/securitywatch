@@ -1,42 +1,23 @@
 import type {
-  SecurityConfig,
-  DetectionResult,
-  SecurityAction,
-  ThreatInfo,
-  Thresholds,
-  Sensitivity,
-  Store,
-  BruteForceConfig,
-  RateLimitConfig,
-} from "../types";
+  SecurityConfig, DetectionResult, SecurityAction,
+  ThreatInfo, Thresholds, Sensitivity, Store,
+} from "../types.js";
 import {
-  detectSQLInjection,
-  detectXSS,
-  createBruteForceDetector,
-  createRateLimiter,
-  createSuspiciousBehaviorDetector,
-  detectPayloadAnomaly,
-} from "./rules";
-import { IPScorer } from "./scorer";
+  detectSQLInjection, detectXSS, createBruteForceDetector,
+  createRateLimiter, createSuspiciousBehaviorDetector, detectPayloadAnomaly,
+} from "./rules/index.js";
+import { IPScorer } from "./scorer.js";
 
-const DEFAULT_THRESHOLDS: Thresholds = {
-  warn: 5,
-  throttle: 10,
-  block: 15,
-};
+const DEFAULT_THRESHOLDS: Thresholds = { warn: 5, throttle: 10, block: 15 };
 
 const SENSITIVITY_MULTIPLIER: Record<Sensitivity, number> = {
-  low: 0.5,
-  medium: 1,
-  high: 1.5,
-  critical: 2,
+  low: 0.5, medium: 1, high: 1.5, critical: 2,
 };
 
 export class DetectionEngine {
   private config: SecurityConfig;
   private thresholds: Thresholds;
-  private scorer: IPScorer;
-  private store: Store;
+  private scorer: IPScorer | null;
 
   private detectBruteForce: ReturnType<typeof createBruteForceDetector>;
   private detectRateLimit: ReturnType<typeof createRateLimiter>;
@@ -44,9 +25,8 @@ export class DetectionEngine {
 
   constructor(config: SecurityConfig, store: Store) {
     this.config = config;
-    this.store = store;
     this.thresholds = { ...DEFAULT_THRESHOLDS, ...config.thresholds };
-    this.scorer = new IPScorer(store);
+    this.scorer = config.ipReputation !== false ? new IPScorer(store) : null;
 
     const bfConfig = typeof config.bruteForce === "object" ? config.bruteForce : undefined;
     this.detectBruteForce = createBruteForceDetector(store, bfConfig);
@@ -63,73 +43,47 @@ export class DetectionEngine {
     method: string;
     body?: string;
     query?: string;
-    headers?: Record<string, string>;
-    statusCode?: number;
+    headers?: string;
   }): ThreatInfo {
-    const { ip, path, method, body, query, statusCode } = params;
+    const { ip, path, method, body, query, headers } = params;
     const results: DetectionResult[] = [];
 
-    // Combine all input sources for payload scanning
-    const inputs = [body, query].filter(Boolean) as string[];
-    const combinedInput = inputs.join(" ");
+    const payloadInputs = [body, query].filter(Boolean) as string[];
+    const combinedPayload = payloadInputs.join(" ");
+    const fullInput = headers ? `${combinedPayload} ${headers}` : combinedPayload;
 
-    // Run enabled rules
-    if (this.config.sqlInjection !== false) {
-      results.push(detectSQLInjection(combinedInput));
-    }
+    if (this.config.sqlInjection !== false) results.push(detectSQLInjection(fullInput));
+    if (this.config.xss !== false) results.push(detectXSS(fullInput));
+    if (this.config.bruteForce !== false) results.push(this.detectBruteForce(ip, path));
+    if (this.config.rateLimit !== false) results.push(this.detectRateLimit(ip, path));
+    if (this.config.suspiciousBehavior !== false) results.push(this.detectSuspicious(ip, path, method));
+    if (this.config.payloadAnomaly !== false) results.push(detectPayloadAnomaly(combinedPayload));
 
-    if (this.config.xss !== false) {
-      results.push(detectXSS(combinedInput));
-    }
-
-    if (this.config.bruteForce !== false) {
-      results.push(this.detectBruteForce(ip, path, statusCode));
-    }
-
-    if (this.config.rateLimit !== false) {
-      results.push(this.detectRateLimit(ip, path));
-    }
-
-    if (this.config.suspiciousBehavior !== false) {
-      results.push(this.detectSuspicious(ip, path, method));
-    }
-
-    if (this.config.payloadAnomaly !== false) {
-      results.push(detectPayloadAnomaly(combinedInput));
-    }
-
-    // Calculate total score
     let totalScore = results
       .filter((r) => r.triggered)
       .reduce((sum, r) => sum + r.score, 0);
 
-    // Apply route sensitivity multiplier
     const sensitivity = this.getRouteSensitivity(path);
     totalScore = Math.round(totalScore * SENSITIVITY_MULTIPLIER[sensitivity]);
 
-    // Add to IP reputation
-    if (totalScore > 0) {
-      this.scorer.addScore(ip, totalScore);
-    } else {
-      // Reward normal behavior
-      this.scorer.addScore(ip, -0.5);
+    if (this.scorer) {
+      this.scorer.addScore(ip, totalScore > 0 ? totalScore : -0.5);
+      const ipScore = this.scorer.getScore(ip);
+      if (ipScore > 20 && totalScore > 0) totalScore += 5;
     }
 
-    // Factor in IP reputation for final decision
-    const ipScore = this.scorer.getScore(ip);
-    const effectiveScore = Math.max(totalScore, ipScore > 20 ? totalScore + 5 : totalScore);
-
-    const action = this.decide(effectiveScore);
-
     return {
-      action,
-      totalScore: effectiveScore,
-      ip,
-      path,
-      method,
+      action: this.decide(totalScore),
+      totalScore,
+      ip, path, method,
       results: results.filter((r) => r.triggered),
       timestamp: new Date(),
     };
+  }
+
+  recordResponse(ip: string, path: string, statusCode: number): void {
+    if (this.config.bruteForce === false) return;
+    this.detectBruteForce(ip, path, statusCode);
   }
 
   private decide(score: number): SecurityAction {
@@ -152,6 +106,6 @@ export class DetectionEngine {
   }
 
   destroy(): void {
-    this.scorer.destroy();
+    this.scorer?.destroy();
   }
 }

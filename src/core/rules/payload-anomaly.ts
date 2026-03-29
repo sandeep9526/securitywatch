@@ -1,7 +1,8 @@
-import type { DetectionResult } from "../../types";
+import type { DetectionResult } from "../../types.js";
 
 const MAX_PAYLOAD_LENGTH = 10_000;
-const SPECIAL_CHAR_THRESHOLD = 0.3; // 30% special characters
+const SPECIAL_CHAR_THRESHOLD = 0.3;
+const MAX_NESTING_DEPTH = 50;
 
 function specialCharRatio(input: string): number {
   if (input.length === 0) return 0;
@@ -9,34 +10,44 @@ function specialCharRatio(input: string): number {
   return specialChars.length / input.length;
 }
 
+function calculateNestingDepth(input: string): number {
+  let maxDepth = 0;
+  let currentDepth = 0;
+  for (const char of input) {
+    if (char === "{" || char === "[") {
+      currentDepth++;
+      if (currentDepth > maxDepth) maxDepth = currentDepth;
+    } else if (char === "}" || char === "]") {
+      currentDepth = Math.max(0, currentDepth - 1);
+    }
+  }
+  return maxDepth;
+}
+
 export function detectPayloadAnomaly(input: string): DetectionResult {
   let score = 0;
   const matched: string[] = [];
 
-  // Oversized payload
   if (input.length > MAX_PAYLOAD_LENGTH) {
     score += 3;
     matched.push(`oversized payload (${input.length} chars)`);
   }
 
-  // High density of special / non-printable characters
   const ratio = specialCharRatio(input);
   if (ratio > SPECIAL_CHAR_THRESHOLD) {
     score += 4;
     matched.push(`high special-char density (${(ratio * 100).toFixed(0)}%)`);
   }
 
-  // Null byte injection
   if (input.includes("\0") || input.includes("%00")) {
     score += 5;
     matched.push("null byte injection");
   }
 
-  // Extremely nested JSON-like structures (potential DoS)
-  const nestingDepth = (input.match(/[{[]/g) || []).length;
-  if (nestingDepth > 50) {
+  const depth = calculateNestingDepth(input);
+  if (depth > MAX_NESTING_DEPTH) {
     score += 3;
-    matched.push(`deeply nested structure (${nestingDepth} levels)`);
+    matched.push(`deeply nested structure (depth ${depth})`);
   }
 
   return {

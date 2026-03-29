@@ -1,22 +1,15 @@
-import type { DetectionResult, Store } from "../../types";
+import type { DetectionResult, Store } from "../../types.js";
 
 const SENSITIVE_PATHS = [
-  "/admin",
-  "/.env",
-  "/config",
-  "/wp-admin",
-  "/wp-login",
-  "/phpmyadmin",
-  "/.git",
-  "/.htaccess",
-  "/server-status",
-  "/debug",
-  "/actuator",
-  "/graphql",
-  "/api/v1/admin",
+  "/admin", "/.env", "/config", "/wp-admin", "/wp-login",
+  "/phpmyadmin", "/.git", "/.htaccess", "/server-status",
+  "/debug", "/actuator", "/graphql", "/api/v1/admin",
 ];
 
 const SUSPICIOUS_EXTENSIONS = /\.(sql|bak|backup|old|orig|conf|log|ini|env)$/i;
+
+const MAX_TRACKED_ROUTES = 100;
+const ENDPOINT_SCAN_THRESHOLD = 20;
 
 export function createSuspiciousBehaviorDetector(store: Store) {
   return function detectSuspiciousBehavior(
@@ -26,9 +19,8 @@ export function createSuspiciousBehaviorDetector(store: Store) {
   ): DetectionResult {
     let score = 0;
     const matched: string[] = [];
-
-    // 1. Sensitive route probing
     const normalizedPath = path.toLowerCase();
+
     for (const sensitive of SENSITIVE_PATHS) {
       if (normalizedPath.startsWith(sensitive)) {
         score += 5;
@@ -37,31 +29,32 @@ export function createSuspiciousBehaviorDetector(store: Store) {
       }
     }
 
-    // 2. Suspicious file extensions
     if (SUSPICIOUS_EXTENSIONS.test(path)) {
       score += 4;
       matched.push("suspicious file extension");
     }
 
-    // 3. Directory traversal
-    if (path.includes("..") || path.includes("%2e%2e")) {
+    if (
+      path.includes("..") || path.includes("%2e%2e") ||
+      path.includes("%2e.") || path.includes(".%2e") ||
+      path.includes("%252e%252e") || path.includes("..%5c") ||
+      path.includes("..%c0%af") || path.includes("..;/")
+    ) {
       score += 6;
       matched.push("directory traversal attempt");
     }
 
-    // 4. Endpoint scanning (many unique routes in short time)
     const routeSetKey = `sb:routes:${ip}`;
     const routes = store.get<string[]>(routeSetKey) ?? [];
-    if (!routes.includes(path)) {
+    if (!routes.includes(path) && routes.length < MAX_TRACKED_ROUTES) {
       routes.push(path);
-      store.set(routeSetKey, routes, 60_000); // 1 minute window
+      store.set(routeSetKey, routes, 60_000);
     }
-    if (routes.length > 20) {
+    if (routes.length > ENDPOINT_SCAN_THRESHOLD) {
       score += 5;
       matched.push(`endpoint scanning (${routes.length} unique routes in 1 min)`);
     }
 
-    // 5. Invalid HTTP methods on common routes
     const unusualMethod =
       (method === "DELETE" || method === "PUT" || method === "PATCH") &&
       (normalizedPath === "/" || normalizedPath.startsWith("/login") || normalizedPath.startsWith("/signup"));

@@ -45,6 +45,7 @@ export interface SecurityConfig {
   alerts?: AlertConfig;
   routeSensitivity?: Record<string, Sensitivity>;
   whitelist?: string[];
+  trustProxy?: boolean;
   thresholds?: Partial<Thresholds>;
   onBlock?: (req: Request, info: ThreatInfo) => void;
   onWarn?: (req: Request, info: ThreatInfo) => void;
@@ -70,4 +71,17 @@ export interface Store {
   set<T = unknown>(key: string, value: T, ttlMs: number): void;
   increment(key: string, ttlMs: number): number;
   delete(key: string): void;
+}
+
+export interface SecurityWatchMiddleware {
+  (req: Request, res: Response, next: NextFunction): void;
+  destroy: () => void;
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      securityWatch?: ThreatInfo;
+    }
+  }
 }
