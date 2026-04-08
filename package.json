@@ -4,6 +4,9 @@
   "description": "Score-based runtime security middleware for Express. SQL injection, XSS, brute force, rate limiting, IP reputation.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "dist"
   ],
@@ -31,7 +34,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sandeepsharmacode/securitywatch"
+    "url": "git+https://github.com/sandeepsharmacode/securitywatch.git"
   },
   "homepage": "https://github.com/sandeepsharmacode/securitywatch#readme",
   "bugs": {
