@@ -34,11 +34,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sandeepsharmacode/securitywatch.git"
+    "url": "git+https://github.com/sandeep9526/securitywatch.git"
   },
-  "homepage": "https://github.com/sandeepsharmacode/securitywatch#readme",
+  "homepage": "https://github.com/sandeep9526/securitywatch#readme",
   "bugs": {
-    "url": "https://github.com/sandeepsharmacode/securitywatch/issues"
+    "url": "https://github.com/sandeep9526/securitywatch/issues"
   },
   "engines": {
     "node": ">=18.0.0"
