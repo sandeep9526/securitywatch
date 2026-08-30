@@ -1,0 +1,12 @@
+.git
+.github
+.idea
+node_modules
+.env
+tests/*
+CHANGELOG.md
+src/*
+package-lock.json
+LICENSE
+tsconfig.json
+Push
